@@ -7,7 +7,7 @@ from geopy.distance import geodesic
 import requests
 
 # ========== CONFIG ==========
-ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjNjMjFlNzAxMGU0NzRiYjBhOGNjNTMyYmIwOGY1N2Y0IiwiaCI6Im11cm11cjY0In0="  # the one you copied from dashboard
+ORS_API_KEY = st.secrets["ORS_API_KEY"]
 
 # ========== LOAD DATA ==========
 hospitals = pd.read_csv("data/Hospitals.csv")
