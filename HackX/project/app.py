@@ -203,7 +203,7 @@ if st.session_state.recommendation:
                 icon=folium.Icon(color="blue", icon="plus-sign")
             ).add_to(m)
 
-        # Selected hospital + route
+        # Selected hospital + highlighted route
         if st.session_state.selected_hospital is not None:
             sel = st.session_state.selected_hospital
 
@@ -213,11 +213,20 @@ if st.session_state.recommendation:
                 icon=folium.Icon(color="green", icon="star")
             ).add_to(m)
 
+            # Background glow
+            folium.PolyLine(
+                sel["route"],
+                color="#00BFFF",
+                weight=12,
+                opacity=0.5
+            ).add_to(m)
+
+            # Main route
             folium.PolyLine(
                 sel["route"],
                 color="red",
                 weight=6,
-                opacity=0.9
+                opacity=1
             ).add_to(m)
 
         st_folium(m, width=1000, height=500)

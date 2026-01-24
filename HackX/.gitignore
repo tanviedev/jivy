@@ -19,4 +19,4 @@ venv/
 *.pkl
 *.joblib
 
-.streamlit/secrets.toml
+project/.streamlit/secrets.toml
