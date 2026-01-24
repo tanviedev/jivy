@@ -32,6 +32,14 @@ from orchestrator import recommend_hospitals
 
 # ================= PAGE CONFIG =================
 st.set_page_config(page_title="JIVY", layout="wide")
+
+def load_css():
+    with open("assets/style.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+load_css()
+
+
 st.title("🚑 JIVY – Urban Emergency Care Navigator (Pune)")
 
 # ================= LOAD DATA =================
