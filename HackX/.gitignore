@@ -18,3 +18,5 @@ venv/
 # Large / sensitive files (optional)
 *.pkl
 *.joblib
+
+.streamlit/secrets.toml
