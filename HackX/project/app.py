@@ -8,6 +8,14 @@ from geopy.geocoders import Nominatim
 from streamlit_js_eval import get_geolocation
 import requests
 
+LOCATION_MAP = {
+    "Pune - Shivajinagar": (18.5308, 73.8475),
+    "Pune - Kothrud": (18.5074, 73.8077),
+    "Pune - Hadapsar": (18.5089, 73.9260),
+    "Pune - Pimpri": (18.6298, 73.7997),
+    "Pune - Viman Nagar": (18.5679, 73.9143)
+}
+
 # ================= SESSION STATE =================
 if "recommendation" not in st.session_state:
     st.session_state.recommendation = None
@@ -42,11 +50,13 @@ def get_user_location():
         return loc["coords"]["latitude"], loc["coords"]["longitude"]
     return None
 
+
 use_gps = st.checkbox(
     "📡 Use live GPS location (recommended)",
     value=True
 )
 
+# ---------------- LIVE GPS (UNCHANGED) ----------------
 if use_gps:
     gps = get_user_location()
     if gps:
@@ -55,14 +65,31 @@ if use_gps:
     else:
         st.warning("GPS unavailable — using fallback")
 
+# ---------------- FALLBACK LOCATION MENU ----------------
 if not use_gps or (lat, lon) == (DEFAULT_LAT, DEFAULT_LON):
-    area = st.text_input("Enter your area (fallback)")
-    if area:
-        geolocator = Nominatim(user_agent="jivy_app")
-        location = geolocator.geocode(f"{area}, Pune, India")
-        if location:
-            lat, lon = location.latitude, location.longitude
 
+    st.markdown("### 📍 Select Your Area (Fallback)")
+
+    location_name = st.selectbox(
+        "Choose a nearby location",
+        options=list(LOCATION_MAP.keys())
+    )
+
+    if location_name:
+        lat, lon = LOCATION_MAP[location_name]
+
+    # OPTIONAL: manual override if user wants
+    with st.expander("🔍 Enter area manually (optional)"):
+        area = st.text_input("Enter your area")
+        if area:
+            geolocator = Nominatim(user_agent="jivy_app")
+            location = geolocator.geocode(f"{area}, Pune, India")
+            if location:
+                lat, lon = location.latitude, location.longitude
+            else:
+                st.warning("Could not find location, using selected area")
+
+# ---------------- FINAL USER LOCATION ----------------
 user_location = (lat, lon)
 
 # ================= ORS HELPER =================
