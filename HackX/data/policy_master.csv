@@ -1,0 +1,5 @@
+insurer,policy_name,max_coverage,icu_covered,room_limit,ambulance_cover,cashless
+TATA AIG,TATA AIG MediCare,500000,Yes,General,Yes,Yes
+Care Health,Care Supreme,300000,Yes,General,No,Yes
+HDFC ERGO,Optima Restore,200000,No,General,Yes,Yes
+Aditya Birla,Health Insurance Plan,300000,No,Single AC,No,Yes
