@@ -1,9 +1,15 @@
+import os
 import pandas as pd
 
+# Resolve data directory relative to this file so it works
+# no matter where the app is launched from.
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
 # Load data once
-USER_POLICY = pd.read_csv("data/user_policy.csv")
-POLICY_MASTER = pd.read_csv("data/policy_master.csv")
-INSURANCE_NETWORK = pd.read_csv("data/insurance_network.csv")
+USER_POLICY = pd.read_csv(os.path.join(DATA_DIR, "user_policy.csv"))
+POLICY_MASTER = pd.read_csv(os.path.join(DATA_DIR, "policy_master.csv"))
+INSURANCE_NETWORK = pd.read_csv(os.path.join(DATA_DIR, "insurance_network.csv"))
 
 def get_user_policy(user_id, policy_name):
     if policy_name == "No Insurance":

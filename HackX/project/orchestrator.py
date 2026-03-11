@@ -1,78 +1,105 @@
-import sys
 import os
+from typing import List, Tuple
+
 import pandas as pd
 
-# -------------------------------------------------
-# Ensure project root is visible
-# -------------------------------------------------
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-# -------------------------------------------------
-# Imports
-# -------------------------------------------------
+from utils.geo import compute_distance
 from ml.risk_model import predict_risk
+from logic.symptom_map import get_required_specializations
 from logic.hospital_filter import filter_hospitals
 from logic.cost_logic import attach_costs
 from logic.insurance_logic import attach_insurance
 from logic.scoring import rank_hospitals
-from utils.geo import compute_distance
 
-# -------------------------------------------------
-# Load DATA explicitly (GLOBAL, ONCE)
-# -------------------------------------------------
-DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
-HOSPITALS = pd.read_csv(os.path.join(DATA_DIR, "clean_pune_hospitals.csv"))
-COSTS = pd.read_csv(os.path.join(DATA_DIR, "costs.csv"))
-INSURANCE = pd.read_csv(os.path.join(DATA_DIR, "insurance.csv"))
-HOSP_INS = pd.read_csv(os.path.join(DATA_DIR, "hospitals_with_insurance.csv"))
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
-# -------------------------------------------------
-# MAIN PIPELINE FUNCTION
-# -------------------------------------------------
-def recommend_hospitals(age, symptoms, user_lat, user_long, policy):
+
+def _load_hospitals() -> pd.DataFrame:
+    path = os.path.join(DATA_DIR, "Hospitals.csv")
+    df = pd.read_csv(path)
+
+    # Normalize key columns we rely on downstream
+    df = df.rename(
+        columns={
+            "facility_type": "facility_type",
+            "ownership": "ownership",
+        }
+    )
+
+    # Ensure numeric lat/long
+    df["lat"] = df["lat"].astype(float)
+    df["long"] = df["long"].astype(float)
+
+    return df
+
+
+_HOSPITALS_MASTER = _load_hospitals()
+
+
+def recommend_hospitals(
+    age: int,
+    symptoms: List[str],
+    user_lat: float,
+    user_long: float,
+    policy: str,
+) -> Tuple[str, pd.DataFrame]:
     """
-    ALWAYS returns at least one recommendation.
+    Main orchestration function used by the Streamlit UI.
+
+    Returns:
+        risk_level (str): "High" / "Medium" / "Low"
+        hospitals (pd.DataFrame): ranked hospitals with at least
+            columns: name, lat, long, hospital_type,
+            estimated_cost, insurance_status, distance_km.
     """
 
-    # 1. Risk assessment
-    risk = predict_risk(age, symptoms)
+    df = _HOSPITALS_MASTER.copy()
 
-    # 2. Risk-based filtering
-    filtered = filter_hospitals(HOSPITALS, risk)
+    # 1️⃣ Risk assessment
+    risk_level = predict_risk(age, symptoms or [])
 
-    # 3. Absolute safety fallback
-    if filtered.empty:
-        filtered = HOSPITALS.copy()
+    # 2️⃣ Compute straight-line distance from user
+    df["distance_km"] = df.apply(
+        lambda row: compute_distance(
+            user_lat,
+            user_long,
+            row["lat"],
+            row["long"],
+        ),
+        axis=1,
+    )
 
-    # 4. Distance calculation
-    filtered = filtered.copy()
-    filtered["distance_km"] = [
-        compute_distance(user_lat, user_long, lat, lon)
-        for lat, lon in zip(filtered["lat"], filtered["long"])
-    ]
+    # 3️⃣ Filter hospitals based on risk level
+    df = filter_hospitals(df, risk_level)
 
-    # 5. Cost & insurance
-    filtered = attach_costs(filtered, COSTS, symptoms)
-    filtered = attach_insurance(filtered, policy, INSURANCE, HOSP_INS, None)
+    # 4️⃣ Attach rough treatment costs based on symptoms
+    costs_path = os.path.join(DATA_DIR, "costs.csv")
+    cost_df = pd.read_csv(costs_path)
+    df = attach_costs(df, cost_df, symptoms or [])
 
-    # 6. Hospital type (human-readable)
-    def classify_hospital(row):
-        if row["facility_type"] in ["Clinic", "Dispensary"]:
-            return "Clinic"
-        if row["ownership"] == "Government":
-            return "Government Hospital"
-        return "Private Hospital"
+    # 5️⃣ Attach simple insurance preference score
+    insurance_df = pd.read_csv(os.path.join(DATA_DIR, "insurance.csv"))
+    df = attach_insurance(
+        df,
+        policy,
+        insurance_df,
+        hosp_ins_df=None,
+        condition=None,
+    )
 
-    filtered["hospital_type"] = filtered.apply(classify_hospital, axis=1)
+    # 6️⃣ Rank and pick top candidates
+    ranked = rank_hospitals(df, risk_level)
 
-    # 7. Ranking
-    ranked = rank_hospitals(filtered, risk)
+    # 7️⃣ Align column names with what the Streamlit app expects
+    if "facility_type" in ranked.columns:
+        ranked["hospital_type"] = ranked["facility_type"]
 
-    # 8. FINAL GUARANTEE
-    if ranked.empty:
-        ranked = filtered.sort_values("distance_km").head(5)
+    # Ensure required columns exist even if missing in raw data
+    for col in ["estimated_cost", "insurance_status"]:
+        if col not in ranked.columns:
+            ranked[col] = "N/A"
 
-    return risk, ranked
+    return risk_level, ranked
+

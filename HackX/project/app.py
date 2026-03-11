@@ -1,5 +1,11 @@
 import sys
 import os
+
+# Ensure project root (HackX) is on sys.path
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 import streamlit as st
 import pandas as pd
 import folium
@@ -7,7 +13,7 @@ from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 from streamlit_js_eval import get_geolocation
 import requests
-
+from logic.insurance_engine import insurance_decision
 LOCATION_MAP = {
     "Pune - Shivajinagar": (18.5308, 73.8475),
     "Pune - Kothrud": (18.5074, 73.8077),
@@ -24,17 +30,14 @@ if "selected_hospital" not in st.session_state:
     st.session_state.selected_hospital = None
 
 # ---------------- PROJECT ROOT ----------------
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
 from orchestrator import recommend_hospitals
 
 # ================= PAGE CONFIG =================
 st.set_page_config(page_title="JIVY", layout="wide")
 
 def load_css():
-    with open("assets/style.css") as f:
+    css_path = os.path.join(BASE_DIR, "assets", "style.css")
+    with open(css_path) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 load_css()
@@ -43,8 +46,8 @@ load_css()
 st.title("🚑 JIVY – Urban Emergency Care Navigator (Pune)")
 
 # ================= LOAD DATA =================
-hospitals_master = pd.read_csv("data/Hospitals.csv")
-insurance_df = pd.read_csv("data/insurance.csv")
+hospitals_master = pd.read_csv(os.path.join(BASE_DIR, "data", "Hospitals.csv"))
+insurance_df = pd.read_csv(os.path.join(BASE_DIR, "data", "insurance.csv"))
 
 # ================= LOCATION =================
 st.subheader("📍 Your Location")
@@ -214,6 +217,19 @@ if st.session_state.recommendation:
                 if st.button(f"🚑 Navigate to {row['name']}", key=f"nav_{i}"):
                     st.session_state.selected_hospital = row
 
+                    insurance_result = insurance_decision(
+                        user_id="u001",  # TEMP (later login)
+                        selected_policy_name=policy,
+                        hospital_name=row["name"],
+                        estimated_cost=row["estimated_cost"],
+                        requires_icu=(
+                            "Chest Pain" in symptoms or
+                            "Breathing Difficulty" in symptoms
+                        )
+                    )
+
+                    st.session_state.insurance_result = insurance_result
+
         # ================= MAP =================
         st.subheader("🗺 Emergency Navigation Map")
 
@@ -266,3 +282,18 @@ if st.session_state.recommendation:
 
         st_folium(m, width=1000, height=500)
         st.error("🚑 Emergency Mode Active — proceed immediately")
+
+# ================= INSURANCE RESULT =================
+if "insurance_result" in st.session_state and st.session_state.insurance_result:
+    result = st.session_state.insurance_result
+
+    st.subheader("🧾 Insurance Eligibility")
+
+    if result["status"] == "CASHLESS":
+        st.success("✅ CASHLESS TREATMENT")
+    elif result["status"] == "PARTIAL":
+        st.warning("⚠️ PARTIAL COVERAGE")
+    else:
+        st.error("❌ OUT OF POCKET")
+
+    st.caption(result["reason"])
