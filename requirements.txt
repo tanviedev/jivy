@@ -5,3 +5,6 @@ streamlit-folium
 geopy
 requests
 streamlit-js-eval
+fastapi
+uvicorn[standard]
+pydantic

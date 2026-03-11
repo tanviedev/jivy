@@ -20,3 +20,6 @@ venv/
 *.joblib
 
 project/.streamlit/secrets.toml
+
+#dependencies
+node_modules/

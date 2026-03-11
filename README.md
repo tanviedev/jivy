@@ -1,3 +1,6 @@
+ streamlit run HackX/project/app.py
+
+
 🏥 Urban Healthcare Navigator
 A Risk-Aware Hospital Recommendation System
 
